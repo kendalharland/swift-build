@@ -40,17 +40,21 @@ jobs:
           show-progress: false
 
       - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ninja-build
 
       - name: Configure Bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
         run: cmake -B ${{ env.BUILD_PATH }} -S ${{ env.SOURCE_PATH }} -G Ninja
 
       - name: Build Bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
         run: cmake --build ${{ env.BUILD_PATH }}
 
       - name: Add Bloaty to Cache
+        if: steps.cache.outputs.cache-hit != 'true'
         # run: |
         #   New-Item -Path ${{ env.CACHE_PATH }} -ItemType Directory -Force | Out-Null
         #   Copy-Item ${{ env.BUILD_PATH }}/bloaty.exe -Destination ${{ env.CACHE_PATH }}
