@@ -4,46 +4,50 @@ name: Release - Binary Sizes
 # TODO(kendal): How do we trigger this on previous releases?
 # TODO(kendal): Add a shortcut for testing (use stub toolchain version, debug metrics tag, etc..).
 # TODO(kendal): Handle debug symbols for the toolchain.
+# TODO(kendal): Convert the bloaty steps into a reusable workflow.
+# TODO(kendal): Pin the bloaty version.
+# TODO(kendal): Use on.releases.[created, edited]
+# TODO(kendal): Support matrix.toolchain_arch=arm64
+
 on:
   pull_request:
 
-  # TODO(kendal): Uncomment
-  # release: [created, edited]
-
 env:
-  CACHE_PATH: cache/bin
+  SOURCE_ROOT: ${{ github.workspace }}/source
+  BUILD_ROOT: ${{ github.workspace }}/build
+  SWIFT_TOOLCHAIN_VERSION: '20240412.2' # TODO(kjharland): ${{ github.ref_name }}
+
+  # Bloaty vars
   BLOATY_CACHE_KEY: bloaty
+  BLOATY_CACHE_PATH: cache/bin/bloaty
+
+  # Binary size data
+  BINARY_SIZES_PATH: ${{ github.workspace }}/binary_sizes.csv
 
 jobs:
-  # TODO(kendal): Convert this to a reusable workflow.
-  # TODO(kendal): Pin the bloaty version.
-  build_bloaty:
+  bloaty:
     name: Build Bloaty
     runs-on: windows-latest
 
-    env:
-      SOURCE_PATH: ${{ github.workspace }}/SourceCache/bloaty
-      BUILD_PATH: ${{ github.workspace }}/BuildCache/bloaty
-
     steps:
-      - name: Cache Bloaty
+      - name: Check the cache for bloaty
         id: cache
         uses: actions/cache@v4
         with:
-          path: ${{ env.CACHE_PATH }}
           key: ${{ env.BLOATY_CACHE_KEY }}
+          path: ${{ env.BLOATY_CACHE_PATH }}
 
-      - name: Checkout Bloaty
+      - name: Checkout google/bloaty
         if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: google/bloaty
           ref: refs/heads/main
-          path: ${{ env.SOURCE_PATH }}
+          path: ${{ env.SOURCE_ROOT }}/bloaty
           show-progress: false
 
       # This step installs Ninja.
-      - name: Setup VS dev environ
+      - name: Setup VS dev environment.
         if: steps.cache.outputs.cache-hit != 'true'
         uses: compnerd/gha-setup-vsdevenv@main
         with:
@@ -51,51 +55,55 @@ jobs:
           components: 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
           arch: amd64
 
-      - name: Configure Bloaty
+      - name: Configure bloaty
         if: steps.cache.outputs.cache-hit != 'true'
-        run: cmake -B ${{ env.BUILD_PATH }} -S ${{ env.SOURCE_PATH }} -G Ninja
+        run: cmake -B ${{ env.BUILD_ROOT }}/bloaty -S ${{ env.SOURCE_ROOT }}/bloaty -G Ninja
 
-      - name: Build Bloaty
+      - name: Build bloaty
         if: steps.cache.outputs.cache-hit != 'true'
-        run: cmake --build ${{ env.BUILD_PATH }}
+        run: cmake --build ${{ env.BUILD_ROOT }}/bloaty
 
-      - name: Add Bloaty to Cache
+      - name: Add bloaty to the cache
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          New-Item -Path ${{ env.CACHE_PATH }} -ItemType Directory -Force | Out-Null
-          Copy-Item ${{ env.BUILD_PATH }}/bloaty.exe -Destination ${{ env.CACHE_PATH }}
+          New-Item -Path ${{ env.BLOATY_CACHE_PATH }} -ItemType Directory -Force | Out-Null
+          Copy-Item ${{ env.BUILD_ROOT }}/bloaty/bloaty.exe -Destination ${{ env.BLOATY_CACHE_PATH }}
 
-  binary_sizes:
-    needs: [build_bloaty]
+  binary_size_data:
+    name: Compute toolchain binary size data
+    needs: [bloaty]
     runs-on: windows-latest
     env:
       BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
 
     strategy:
       matrix:
-        # TODO(kendal): Support arm64
         toolchain_arch: [amd64]
 
     steps:
-      - name: Download Bloaty
+      - name: Get bloaty from the cache
+        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v3
         with:
-          path: ${{ env.CACHE_PATH }}
           key: ${{ env.BLOATY_CACHE_KEY }}
+          path: ${{ env.BLOATY_CACHE_PATH }}
 
-      - name: Install Bloaty
-        run: echo ${{ env.CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Install bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Swift toolchain
+        if: steps.cache.outputs.cache-hit != 'true'
         uses: compnerd/gha-setup-swift@main
         with:
           github-repo: thebrowsercompany/swift-build
           github-token: ${{ secrets.GITHUB_TOKEN }}
           release-asset-name: installer-${{ matrix.toolchain_arch }}.exe
-          release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
+          release-tag-name: ${{ env.SWIFT_TOOLCHAIN_VERSION }}
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
       - name: Generate ${{ env.BLOATY_OPTIONS_FILE }}
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
@@ -105,22 +113,61 @@ jobs:
           $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
           # Generate the list of input files.
+          # Each input filename must be an absolute path.
+          # Unix-style path separators are required.
           Get-ChildItem -Recurse -Name -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" | `
             %{ echo "filename: `"${SwiftInstallRoot}\$_`"" } | `
             %{ $_ -replace '\\','/' } | `
             # Text protos must be ascii encoded.
             Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
-          # Sort by file size for consistent output.
+          # Sort for consistent output.
           echo "sort_by: SORTBY_FILESIZE" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
-          # Specify data sources
+          # Specify which data sources to use.
           echo "data_source: `"inputfiles`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
           echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
       - name: Show ${{ env.BLOATY_OPTIONS_FILE }}
+        if: steps.cache.outputs.cache-hit != 'true'
         run: Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
         # TODO(google/bloaty/issues/375): Bloaty accepts -n 0 but not max_rows_per_level: 0 in its config.
-        run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -n 0 --csv
+        run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BINARY_SIZES_PATH }} -Encoding utf8
+
+      - name: "Upload binary size data"
+        uses: "actions/upload-artifact@v4"
+        with:
+          name: binary_size_data-${{ matrix.toolchain_arch }}
+          path: ${{ env.BINARY_SIZES_PATH }}
+          overwrite: true
+
+  upload_to_datadog:
+    needs: [binary_size_data]
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        toolchain_arch: [amd64]
+
+    steps:
+      - name: Checkout swift-build
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.SOURCE_ROOT }}/swift-build
+          show-progress: false
+
+      - name: Download binary size data
+        uses: actions/download-artifact@v4
+        with:
+          name: binary_size_data-${{ matrix.toolchain_arch }}
+          path: ${{ env.BINARY_SIZES_PATH }}
+
+      - name: Install dependencies
+        run: pip install datadog
+
+      - name: Upload to DataDog
+        run: |
+          $Script="${{ env.SOURCE_ROOT }}/swift-build/scripts/python/datadog/upload_toolchain_binary_sizes.py"
+          python ${Script} ${{ env.BINARY_SIZES_PATH }}
