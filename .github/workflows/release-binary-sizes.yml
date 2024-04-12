@@ -90,7 +90,7 @@ jobs:
         with:
           github-repo: thebrowsercompany/swift-build
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          release-asset-name: installer-amd64.exe
+          release-asset-name: installer-${{ matrix.toolchain_arch }}.exe
           release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
