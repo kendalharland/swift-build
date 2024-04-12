@@ -13,6 +13,7 @@ env:
   TEST_TOOCLAHIN_VESION:
 
 jobs:
+  # TODO(kendal): Convert this to a reusable workflow.
   build_bloaty:
     name: Build Bloaty
     # TODO(kendal): Use windows
