@@ -95,7 +95,7 @@ jobs:
           release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
-      - name: Generate bloaty options file
+      - name: Generate bloaty.proto
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
@@ -104,7 +104,7 @@ jobs:
           $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
           # Generate the list of input files.
-          Get-ChildItem -Recurse -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" -Name | %{ echo 'filename: "$_"' } | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+          Get-ChildItem -Recurse -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" -Name | %{ echo "filename: `"$_`"" } | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
           # Don't collapse section headers.
           echo "max_rows_per_level: 0" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
@@ -112,7 +112,7 @@ jobs:
           # Sort by file size for consistent output.
           echo "sort_by: file" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
-          # Print the output for easier debugging.
+          # Print the file for debugging.
           Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
