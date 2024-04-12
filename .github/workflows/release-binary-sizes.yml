@@ -105,8 +105,8 @@ jobs:
           $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
           # Generate the list of input files.
-          Get-ChildItem -Recurse -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" -Name | `
-            %{ echo "filename: `"$_`"" } | `
+          Get-ChildItem -Recurse -Name -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" | `
+            %{ echo "filename: `"${SwiftInstallRoot}\$_`"" } | `
             %{ $_ -replace '\\','/' } | `
             # Text protos must be ascii encoded.
             Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
