@@ -95,7 +95,7 @@ jobs:
           release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
-      - name: Generate bloaty.textproto
+      - name: Generate ${{ env.BLOATY_OPTIONS_FILE }}
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
@@ -108,14 +108,19 @@ jobs:
           Get-ChildItem -Recurse -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" -Name | `
             %{ echo "filename: `"$_`"" } | `
             %{ $_ -replace '\\','/' } | `
-            Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+            # Text protos must be ascii encoded.
+            Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
           # Sort by file size for consistent output.
-          echo "sort_by: SORTBY_FILESIZE" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+          echo "sort_by: SORTBY_FILESIZE" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
-          # Print the file for debugging.
-          Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
+          # Specify data sources
+          echo "data_source: `"inputfiles`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+          echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+
+      - name: Show ${{ env.BLOATY_OPTIONS_FILE }}
+        run: Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
-        # google/bloaty/issues/375: Bloaty accepts -n 0 but not max_rows_per_level: 0 in its config.
+        # TODO(google/bloaty/issues/375): Bloaty accepts -n 0 but not max_rows_per_level: 0 in its config.
         run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -n 0 --csv
