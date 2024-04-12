@@ -42,7 +42,7 @@ jobs:
           show-progress: false
 
       - name: Configure Bloaty
-        run: cmake -B ${{ env.BUILD_PATH }} build -G Ninja -S ${{ env.SOURCE_PATH }}
+        run: cmake -B ${{ env.BUILD_PATH }} -G Ninja -S ${{ env.SOURCE_PATH }}
 
       - name: Build Bloaty
         run: |
