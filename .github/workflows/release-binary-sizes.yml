@@ -104,7 +104,10 @@ jobs:
           $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
           # Generate the list of input files.
-          Get-ChildItem -Recurse -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" -Name | %{ echo "filename: `"$_`"" } | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+          Get-ChildItem -Recurse -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" -Name | `
+            %{ echo "filename: `"$_`"" } | `
+            %{ $_ -replace '\\','/' } | `
+            Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
           # Don't collapse section headers.
           echo "max_rows_per_level: 0" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
