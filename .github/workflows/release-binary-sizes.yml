@@ -113,7 +113,7 @@ jobs:
           echo "max_rows_per_level: 0" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
           # Sort by file size for consistent output.
-          echo "sort_by: file" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+          echo "sort_by: SORTBY_FILESIZE" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
           # Print the file for debugging.
           Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
