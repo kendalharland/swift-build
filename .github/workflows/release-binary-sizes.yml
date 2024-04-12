@@ -73,7 +73,8 @@ jobs:
 
     strategy:
       matrix:
-        toolchain_arch: [amd64, arm64]
+        # TODO(kendal): Support arm64
+        toolchain_arch: [amd64]
 
     steps:
       - name: Download Bloaty
@@ -111,6 +112,7 @@ jobs:
           # Sort by file size for consistent output.
           echo "sort_by: file" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
+          # Print the output for easier debugging.
           Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
