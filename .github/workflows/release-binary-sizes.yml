@@ -41,8 +41,13 @@ jobs:
           path: ${{ env.SOURCE_PATH }}
           show-progress: false
 
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build
+
       - name: Configure Bloaty
-        run: cmake -B ${{ env.BUILD_PATH }} -G Ninja -S ${{ env.SOURCE_PATH }}
+        run: cmake -B ${{ env.BUILD_PATH }} -S ${{ env.SOURCE_PATH }} -G Ninja
 
       - name: Build Bloaty
         run: |
