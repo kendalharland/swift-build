@@ -31,7 +31,7 @@ jobs:
           key: ${{ env.BLOATY_CACHE_KEY }}
 
       - name: Checkout Bloaty
-        if: steps.cache-bloaty.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: google/bloaty
