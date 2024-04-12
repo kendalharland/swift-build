@@ -69,7 +69,7 @@ jobs:
     needs: [build_bloaty]
     runs-on: windows-latest
     env:
-      BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.proto
+      BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
 
     strategy:
       matrix:
@@ -95,11 +95,12 @@ jobs:
           release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
-      - name: Generate bloaty.proto
+      - name: Generate bloaty.textproto
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
-          # Locate the toolchain installation <root> from '<root>/Toolchains/<toolchain-version>/usr/bin/swift.exe'.
+          # Locate the toolchain installation <root> by walking up from
+          # '<root>/Toolchains/<toolchain-version>/usr/bin/swift.exe'.
           $SwiftPath=$(Get-Command swift).Source
           $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
@@ -109,9 +110,6 @@ jobs:
             %{ $_ -replace '\\','/' } | `
             Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
-          # Don't collapse section headers.
-          echo "max_rows_per_level: 0" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
-
           # Sort by file size for consistent output.
           echo "sort_by: SORTBY_FILESIZE" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
 
@@ -119,4 +117,5 @@ jobs:
           Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
-        run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} --csv
+        # google/bloaty/issues/375: Bloaty accepts -n 0 but not max_rows_per_level: 0 in its config.
+        run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -n 0 --csv
