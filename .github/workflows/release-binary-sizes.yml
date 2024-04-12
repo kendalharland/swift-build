@@ -13,6 +13,7 @@ env:
 
 jobs:
   # TODO(kendal): Convert this to a reusable workflow.
+  # TODO(kendal): Pin the bloaty version.
   build_bloaty:
     name: Build Bloaty
     runs-on: windows-latest
@@ -38,7 +39,8 @@ jobs:
           path: ${{ env.SOURCE_PATH }}
           show-progress: false
 
-      - name: Setup VS dev environ 
+      # This step installs Ninja.
+      - name: Setup VS dev environ
         if: steps.cache.outputs.cache-hit != 'true'
         uses: compnerd/gha-setup-vsdevenv@main
         with:
@@ -68,14 +70,22 @@ jobs:
         toolchain_arch: [amd64, arm64]
 
     steps:
-      - name: Cache Bloaty
+      - name: Download Bloaty
         uses: actions/cache/restore@v3
         with:
           path: ${{ env.CACHE_PATH }}
           key: ${{ env.BLOATY_CACHE_KEY }}
-
-      - name: Add Bloaty to PATH
+        
+      - name: Install Bloaty
         run: echo ${{ env.CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Run Bloaty
-        run: bloaty --help
+      - name: Install Swift toolchain
+        uses: compnerd/gha-setup-swift@main
+        with:
+          github-repo: thebrowsercompany/swift-build
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          release-asset-name: installer-amd64.exe
+          release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
+
+      - name: Test Swift
+        run: swift --help
