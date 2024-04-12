@@ -2,8 +2,8 @@
 name: Release - Binary Sizes
 
 # TODO(kendal): How do we trigger this on previous releases?
-# TODO(kendal): Add a shortcut for testing (use stub toolchain version, debug metrics tag, etc..)
-
+# TODO(kendal): Add a shortcut for testing (use stub toolchain version, debug metrics tag, etc..).
+# TODO(kendal): Handle debug symbols for the toolchain.
 on:
   pull_request:
 
@@ -68,6 +68,9 @@ jobs:
   binary_sizes:
     needs: [build_bloaty]
     runs-on: windows-latest
+    env:
+      BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.proto
+
     strategy:
       matrix:
         toolchain_arch: [amd64, arm64]
@@ -78,7 +81,7 @@ jobs:
         with:
           path: ${{ env.CACHE_PATH }}
           key: ${{ env.BLOATY_CACHE_KEY }}
-        
+
       - name: Install Bloaty
         run: echo ${{ env.CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
@@ -90,7 +93,25 @@ jobs:
           release-asset-name: installer-amd64.exe
           release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
 
-      - name: Run bloaty on swift.exe
-        run: bloaty $(Get-Command swift).Source --csv -n 0
+      # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
+      - name: Generate bloaty options file
+        run: |
+          New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
+          # Locate the toolchain installation <root> from '<root>/Toolchains/<toolchain-version>/usr/bin/swift.exe'.
+          $SwiftPath=$(Get-Command swift).Source
+          $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
+          # Generate the list of input files.
+          Get-ChildItem -Recurse -Path ${SwiftInstallRoot} -Include "*.dll","*.exe" -Name | %{ echo 'filename: "$_"' } | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+
+          # Don't collapse section headers.
+          echo "max_rows_per_level: 0" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+
+          # Sort by file size for consistent output.
+          echo "sort_by: file" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append
+
+          Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
+
+      - name: Run bloaty
+        run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} --csv
