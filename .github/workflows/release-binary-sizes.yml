@@ -1,6 +1,9 @@
 # Uploads a toolchain release's binary size metrics to DataDog.
 name: Release - Binary Sizes
 
+# TODO(kendal): How do we trigger this on previous releases?
+# TODO(kendal): Add a shortcut for testing (use stub toolchain version, debug metrics tag, etc..)
+
 on:
   pull_request:
 
@@ -87,5 +90,7 @@ jobs:
           release-asset-name: installer-amd64.exe
           release-tag-name: '20240412.2' # TODO(kjharland): Use GITHUB_REF
 
-      - name: Test Swift
-        run: swift --help
+      - name: Run bloaty on swift.exe
+        run: bloaty $(Get-Command swift).Source --csv -n 0
+
+
