@@ -1,4 +1,10 @@
 # Uploads a toolchain release's binary size metrics to DataDog.
+# 
+# To target a specific Swift Toolchain Release, run:
+# 
+#     gh workflow run release-binary-sizes -f version=$TOOLCHAIN_VERSION
+#
+#
 name: Release - Binary Sizes
 
 # TODO(kendal): How do we trigger this on previous releases?
@@ -12,10 +18,19 @@ name: Release - Binary Sizes
 on:
   pull_request:
 
+  workflow_dispatch:
+    inputs:
+      toolchain_version:
+        description: 'The release version of the toolchain to use'
+        required: false
+        type: string
+        default: ''
+
 env:
   SOURCE_ROOT: ${{ github.workspace }}/source
   BUILD_ROOT: ${{ github.workspace }}/build
-  SWIFT_TOOLCHAIN_VERSION: '20240412.2' # TODO(kjharland): ${{ github.ref_name }}
+  # TODO(kendal): The default should be github.ref_name
+  SWIFT_TOOLCHAIN_VERSION: ${{ github.events.inputs.toolchain_version || '20240412.2' }}
 
   # Bloaty vars
   BLOATY_CACHE_KEY: bloaty
