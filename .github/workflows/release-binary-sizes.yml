@@ -102,7 +102,7 @@ jobs:
           release-tag-name: ${{ env.SWIFT_TOOLCHAIN_VERSION }}
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
-      - name: Generate ${{ env.BLOATY_OPTIONS_FILE }}
+      - name: Generate bloaty options file
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
@@ -128,7 +128,7 @@ jobs:
           echo "data_source: `"inputfiles`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
           echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
-      - name: Show ${{ env.BLOATY_OPTIONS_FILE }}
+      - name: Show bloaty options file
         if: steps.cache.outputs.cache-hit != 'true'
         run: Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
@@ -165,7 +165,7 @@ jobs:
           path: ${{ env.BINARY_SIZES_PATH }}
 
       - name: Install dependencies
-        run: pip install datadog
+        run: pip install datadog_api_client
 
       - name: Upload to DataDog
         run: |
