@@ -113,8 +113,6 @@ jobs:
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
       - name: Generate bloaty options file
-        if: steps.cache.outputs.cache-hit != 'true'
-        id:
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
@@ -135,11 +133,9 @@ jobs:
           echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
       - name: Show bloaty options file
-        if: steps.cache.outputs.cache-hit != 'true'
         run: Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
-        if: steps.cache.outputs.cache-hit != 'true'
         # TODO(google/bloaty/issues/375): Bloaty accepts -n 0 but not max_rows_per_level: 0 in its config.
         run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BINARY_SIZES_PATH }} -Encoding utf8
 
@@ -183,7 +179,6 @@ jobs:
             --environment=ci
 
       - name: Show csv data to upload
-        if: steps.cache.outputs.cache-hit != 'true'
         run: Get-Content -Path ${{ github.workspace }}/bq_table_data.csv
 
       - name: Authenticate to AWS
