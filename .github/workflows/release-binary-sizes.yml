@@ -152,8 +152,8 @@ jobs:
         # TODO(google/bloaty/issues/375): Bloaty accepts -n 0 but not max_rows_per_level: 0 in its config.
         run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BINARY_SIZES_PATH }} -Encoding utf8
 
-      - name: "Upload binary size data"
-        uses: "actions/upload-artifact@v4"
+      - name: Upload binary size data
+        uses: actions/upload-artifact@v4
         with:
           name: binary_size_data-${{ matrix.toolchain_arch }}
           path: ${{ env.BINARY_SIZES_PATH }}
@@ -193,15 +193,29 @@ jobs:
           $SwiftPath=$(Get-Command swift).Source
           $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
-          $Script="${{ env.SOURCE_ROOT }}/swift-build/scripts/python/binary_sizes/generate_bigquery_table_data.py
+          $Script="${{ env.SOURCE_ROOT }}/swift-build/scripts/python/binary_sizes/generate_bigquery_table_data.py"
           python ${Script} ${{ env.BINARY_SIZES_PATH }} `
             ${{ github.workspace }}/bq_table_data.csv `
             --toolchain_version=${{ env.SWIFT_TOOLCHAIN_VERSION }} `
-            --strip_inputfiles_prefix=${SwiftInstallRoot} `
+            --strip_inputfiles_prefix=${SwiftInstallRoot}
 
       - name: Show csv data to upload
         if: steps.cache.outputs.cache-hit != 'true'
         run: Get-Content -Path ${{ github.workspace }}/bq_table_data.csv
+
+      - name: Authenticate to AWS
+        # configure-aws-credentials v4.0.1 release
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a
+        with:
+          role-to-assume: ${{ secrets.SWIFT_TOOLCHAIN_UPLOADER_ROLE_ARN }}
+          aws-region: us-east-2
+          role-session-name: SwiftToolchainMetricsUploader
+
+      - name: Get BigQuery Service Account Credentials
+        uses: ./.github/actions/get-ssm-parameter
+        with:
+          ssm-parameter: "/shared/secrets/GITHUB_ACTIONS_BQ_DATA_UPLOAD"
+          env-variable-name: "GOOGLE_APPLICATION_CREDENTIALS"
 
       - name: Upload to BigQuery
         run: |
