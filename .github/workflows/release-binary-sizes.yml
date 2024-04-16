@@ -7,8 +7,6 @@
 #
 name: Release - Binary Sizes
 
-# TODO(kendal): How do we trigger this on previous releases?
-# TODO(kendal): Add a shortcut for testing (use stub toolchain version, debug metrics tag, etc..).
 # TODO(kendal): Handle debug symbols for the toolchain.
 # TODO(kendal): Convert the bloaty steps into a reusable workflow.
 # TODO(kendal): Pin the bloaty version.
@@ -97,18 +95,15 @@ jobs:
 
     steps:
       - name: Get bloaty from the cache
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v3
         with:
           key: ${{ env.BLOATY_CACHE_KEY }}
           path: ${{ env.BLOATY_CACHE_PATH }}
 
       - name: Install bloaty
-        if: steps.cache.outputs.cache-hit != 'true'
         run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Swift toolchain
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: compnerd/gha-setup-swift@main
         with:
           github-repo: thebrowsercompany/swift-build
@@ -119,13 +114,9 @@ jobs:
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
       - name: Generate bloaty options file
         if: steps.cache.outputs.cache-hit != 'true'
+        id:
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
-
-          # Locate the toolchain installation <root> by walking up from
-          # '<root>/Toolchains/<toolchain-version>/usr/bin/swift.exe'.
-          $SwiftPath=$(Get-Command swift).Source
-          $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
 
           # Generate the list of input files.
           # Each input filename must be an absolute path.
@@ -159,15 +150,6 @@ jobs:
           path: ${{ env.BINARY_SIZES_PATH }}
           overwrite: true
 
-  upload_to_bigquery:
-    needs: [binary_size_data]
-    environment: binary_sizes_test # TODO(kendal): Delete
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        toolchain_arch: [amd64]
-
-    steps:
       - name: Checkout swift-build
         uses: actions/checkout@v4
         with:
@@ -198,6 +180,7 @@ jobs:
             ${{ github.workspace }}/bq_table_data.csv `
             --toolchain_version=${{ env.SWIFT_TOOLCHAIN_VERSION }} `
             --strip_inputfiles_prefix=${SwiftInstallRoot}
+            --environment=ci
 
       - name: Show csv data to upload
         if: steps.cache.outputs.cache-hit != 'true'
