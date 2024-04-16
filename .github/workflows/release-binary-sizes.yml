@@ -1,7 +1,7 @@
 # Uploads a toolchain release's binary size metrics to DataDog.
-# 
+#
 # To target a specific Swift Toolchain Release, run:
-# 
+#
 #     gh workflow run release-binary-sizes -f version=$TOOLCHAIN_VERSION
 #
 #
@@ -159,8 +159,9 @@ jobs:
           path: ${{ env.BINARY_SIZES_PATH }}
           overwrite: true
 
-  upload_to_datadog:
+  upload_to_bigquery:
     needs: [binary_size_data]
+    environment: binary_sizes_test # TODO(kendal): Delete
     runs-on: windows-latest
     strategy:
       matrix:
@@ -179,10 +180,30 @@ jobs:
           name: binary_size_data-${{ matrix.toolchain_arch }}
           path: ${{ env.BINARY_SIZES_PATH }}
 
-      - name: Install dependencies
-        run: pip install datadog_api_client
-
-      - name: Upload to DataDog
+      - name: Install Python dependencies
         run: |
-          $Script="${{ env.SOURCE_ROOT }}/swift-build/scripts/python/datadog/upload_toolchain_binary_sizes.py"
-          python ${Script} ${{ env.BINARY_SIZES_PATH }}
+          pip install google-cloud-bigquery
+          pip install google-auth-oathlib
+          pip install pandas
+
+      - name: Generate BigQuery table data
+        run: |
+          # Locate the toolchain installation <root> by walking up from
+          # '<root>/Toolchains/<toolchain-version>/usr/bin/swift.exe'.
+          $SwiftPath=$(Get-Command swift).Source
+          $SwiftInstallRoot=${SwiftPath} | Split-Path | Split-Path | Split-Path | Split-Path | Split-Path
+
+          $Script="${{ env.SOURCE_ROOT }}/swift-build/scripts/python/binary_sizes/generate_bigquery_table_data.py
+          python ${Script} ${{ env.BINARY_SIZES_PATH }} `
+            ${{ github.workspace }}/bq_table_data.csv `
+            --toolchain_version=${{ env.SWIFT_TOOLCHAIN_VERSION }} `
+            --strip_inputfiles_prefix=${SwiftInstallRoot} `
+
+      - name: Show csv data to upload
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: Get-Content -Path ${{ github.workspace }}/bq_table_data.csv
+
+      - name: Upload to BigQuery
+        run: |
+          $Script="${{ env.SOURCE_ROOT }}/swift-build/scripts/python/binary_sizes/upload_csv_to_bigquery.py
+          python ${Script} ${{ github.workspace }}/bq_table_data.csv
